@@ -20,7 +20,8 @@
 /cook_modules/
 /cook.lock
 /compile_commands.json
-/CMakeFiles/                                       # cook's cmake-driver probe artefact
+# cook's cmake-driver probe artefact (cmake --find-package side-effect)
+/CMakeFiles/
 
 # User-provided game assets (legal Doom 3 install required)
 /base/maps/*.proc
