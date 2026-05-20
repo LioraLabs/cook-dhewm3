@@ -1,96 +1,170 @@
--- ============================================================
---  dhewm3 — Doom 3 source port, built with Cook
---
---  Linux build. The engine, its built-in compilers (dmap,
---  runaas), and the asset pipeline that USES those compilers
---  all live in one DAG. `cook game` builds the binary and
---  bakes every map in one parallel run, with full caching.
--- ============================================================
+# ============================================================
+#  dhewm3 — Doom 3 source port, built with Cook
+#
+#  Linux build. The engine, its built-in compilers (dmap,
+#  runaas), and the asset pipeline that USES those compilers
+#  all live in one DAG. `cook game` builds the binary and
+#  bakes every map in one parallel run, with full caching.
+# ============================================================
 
 use cook_cc
 
-cook_cc.toolchain({ standard = "c++14", warnings = "off" })
+register
+    cook_cc.toolchain({ standard = "c++14", warnings = "none" })
 
-cook_cc.defaults({
-    defines      = { "_GNU_SOURCE", "ID_PC_LINUX", "USE_OPENAL" },
-    extra_cflags = "-fno-strict-aliasing -fvisibility=hidden",
-})
+    cook_cc.defaults({
+        defines      = { "_GNU_SOURCE", "ID_PC_LINUX", "USE_OPENAL",
+                         # x86_64 / x86 / arm / arm64 are all little-endian.
+                         # dhewm3's CMakeLists uses TestBigEndian for this.
+                         "D3_IS_BIG_ENDIAN=0",
+                         # Host bitness + arch tag — CMakeLists derives these
+                         # from CMAKE_SIZEOF_VOID_P and `-dumpmachine` parsing.
+                         # Hardcoded to 64-bit x86_64 for this Linux-only fork.
+                         "D3_SIZEOFPTR=8",
+                         "D3_ARCH=\\\"x86_64\\\"" },
+        # neo/libs/imgui is dhewm3's vendored Dear ImGui; sys lib + the imgui
+        # lib both need this on their include path.
+        includes     = { "neo/libs/imgui" },
+        extra_cflags = "-fno-strict-aliasing -fvisibility=hidden",
+    })
 
--- -----------------------------------------------------------
---  Engine static libs (in dependency order)
--- -----------------------------------------------------------
-
-cook_cc.lib("idLib", {
-    dir              = "neo/idlib/",
-    export_includes  = { "neo", "neo/idlib" },
-    defines          = { "ID_LIB_INTERNAL" },
-})
-
-cook_cc.lib("framework", { dir = "neo/framework/", links = { "idLib" } })
-cook_cc.lib("cm",        { dir = "neo/cm/",        links = { "idLib" } })
-
-cook_cc.lib("renderer", {
-    dir   = "neo/renderer/",
-    links = { "idLib", "framework" },
-    needs = { "GL" },
-})
-
-cook_cc.lib("sound", {
-    dir   = "neo/sound/",
-    links = { "idLib", "framework" },
-    needs = { "OpenAL" },
-})
-
-cook_cc.lib("game", {
-    dir   = "neo/game/",
-    links = { "idLib", "framework", "cm", "renderer", "sound" },
-})
-
-cook_cc.lib("d3xp", {
-    dir   = "neo/d3xp/",
-    links = { "idLib", "framework", "cm", "renderer", "sound" },
-})
-
-cook_cc.lib("compilers", {
-    dir   = "neo/tools/compilers/",
-    links = { "idLib", "framework", "renderer", "cm" },
-})
-
--- -----------------------------------------------------------
---  Platform abstraction — per-OS source selection
--- -----------------------------------------------------------
-
-local sys_sources = fs.glob({ "neo/sys/*.cpp", "neo/sys/sdl/*.cpp" })
-if cook.platform.os == "linux" then
-    for _, s in ipairs(fs.glob({ "neo/sys/posix/*.cpp",
-                                 "neo/sys/linux/*.cpp" })) do
-        table.insert(sys_sources, s)
+    # ----- Source-list helper --------------------------------
+    # dhewm3 keeps a handful of dead .cpp files in the tree that the
+    # upstream CMakeLists explicitly omits. `srcs(dir, excludes)` is the
+    # tight glob + exclude pattern.
+    local function srcs(dir, excludes)
+        local skip = {}
+        for _, e in ipairs(excludes or {}) do skip[e] = true end
+        local out = {}
+        for _, s in ipairs(fs.glob(dir .. "/**/*.cpp")) do
+            local rel = s:sub(#dir + 2)            -- strip "dir/" prefix
+            if not skip[rel] then out[#out + 1] = s end
+        end
+        return out
     end
-end
 
-cook_cc.lib("sys", {
-    sources = sys_sources,
-    links   = { "idLib", "framework" },
-    needs   = { "SDL2" },
-})
+    # ----- Configure header (replaces CMake's configure_file) -------
 
--- -----------------------------------------------------------
---  The dhewm3 binary: engine + game + in-engine compilers
--- -----------------------------------------------------------
+    local cfg = cook_cc.config_header(
+        "neo/config.h.in",
+        "build/dhewm3/config.h",
+        {
+            os                          = "linux",
+            cpu                         = "x86_64",
+            CMAKE_SHARED_LIBRARY_SUFFIX = ".so",
+            libdir                      = "",
+            datadir                     = "",
+            HAVE_JPEG_MEM_SRC           = true,
+            ID_ENABLE_CURL              = true,
+        }
+    )
 
-cook_cc.bin("dhewm3", {
-    sources = { "neo/sys/main.cpp" },
-    links   = { "sys", "framework", "renderer", "sound", "cm",
-                "game", "d3xp", "compilers" },
-    needs   = { "SDL2", "OpenAL", "libcurl", "zlib" },
-})
+    # ----- Engine static libs (in dependency order) ----------
 
--- ============================================================
---  Asset pipeline — same DAG, dhewm3 is the tool
--- ============================================================
---  `$<dhewm3>` in each cook command IS the cross-recipe dep:
---  the engine infers that every map output needs dhewm3
---  rebuilt. `$<in.stem>` fans the step out, one unit per .map.
+    cook_cc.lib("idLib", {
+        # Bare `includes` is used by the target itself AND exported to
+        # consumers via the CS-0080 backcompat fall-back (includes is the
+        # only field where bare → public propagation still applies).
+        # build/dhewm3 carries the generated config.h.
+        sources  = srcs("neo/idlib", { "geometry/Surface_Polytope.cpp",
+                                       "math/Complex.cpp" }),
+        includes = { "neo", "neo/idlib", "build/dhewm3" },
+        defines  = { "ID_LIB_INTERNAL" },
+        # SDL2 ships idlib's endian macros; needed for compile, not link.
+        needs    = { "SDL2" },
+        requires = { cfg },
+    })
+
+    cook_cc.lib("framework", { sources = srcs("neo/framework"), links = { "idLib" },                          needs = { "SDL2" }, requires = { cfg } })
+    cook_cc.lib("cm",        { sources = srcs("neo/cm"),        links = { "idLib" },                          needs = { "SDL2" }, requires = { cfg } })
+    cook_cc.lib("ui",        { sources = srcs("neo/ui", { "GameWindow.cpp" }), links = { "idLib", "framework" }, needs = { "SDL2" }, requires = { cfg } })
+
+    # Dear ImGui — vendored under neo/libs/imgui (CMakeLists' `src_imgui`).
+    cook_cc.lib("imgui", {
+        sources = {
+            "neo/libs/imgui/imgui.cpp",
+            "neo/libs/imgui/imgui_draw.cpp",
+            "neo/libs/imgui/imgui_tables.cpp",
+            "neo/libs/imgui/imgui_widgets.cpp",
+            "neo/libs/imgui/imgui_demo.cpp",
+            "neo/libs/imgui/backends/imgui_impl_sdl2.cpp",
+            "neo/libs/imgui/backends/imgui_impl_opengl2.cpp",
+        },
+        needs = { "SDL2", "GL" },
+    })
+
+    cook_cc.lib("renderer", {
+        sources  = srcs("neo/renderer"),
+        links    = { "idLib", "framework" },
+        needs    = { "GL", "SDL2" },
+        requires = { cfg },
+    })
+
+    cook_cc.lib("sound", {
+        sources  = srcs("neo/sound"),
+        links    = { "idLib", "framework" },
+        needs    = { "OpenAL", "SDL2" },
+        requires = { cfg },
+    })
+
+    # `gamecode` not `game` so it doesn't shadow the top-level `recipe game`
+    # aggregate. Same applies to `d3xp` (not renamed; doesn't clash).
+    cook_cc.lib("gamecode", {
+        sources  = srcs("neo/game", { "EndLevel.cpp", "gamesys/Callbacks.cpp" }),
+        links    = { "idLib", "framework", "cm", "renderer", "sound", "ui" },
+        needs    = { "SDL2" },
+        requires = { cfg },
+    })
+
+    cook_cc.lib("d3xp", {
+        sources  = srcs("neo/d3xp", { "EndLevel.cpp", "gamesys/Callbacks.cpp" }),
+        links    = { "idLib", "framework", "cm", "renderer", "sound", "ui" },
+        needs    = { "SDL2" },
+        requires = { cfg },
+    })
+
+    cook_cc.lib("compilers", {
+        sources  = srcs("neo/tools/compilers"),
+        links    = { "idLib", "framework", "renderer", "cm" },
+        needs    = { "SDL2" },
+        requires = { cfg },
+    })
+
+    # ----- Platform abstraction (per-OS source selection) ----
+    # sys lib: the SDL-using sys/*.cpp + POSIX helpers. The Linux entry
+    # point (sys/linux/main.cpp) is the binary's source, not the lib's,
+    # to avoid duplicating main() at link time.
+
+    local sys_sources = fs.glob({ "neo/sys/*.cpp" })
+    if cook.platform.os == "linux" then
+        for _, s in ipairs(fs.glob({ "neo/sys/posix/*.cpp" })) do
+            table.insert(sys_sources, s)
+        end
+    end
+
+    cook_cc.lib("sys", {
+        sources  = sys_sources,
+        links    = { "idLib", "framework", "imgui" },
+        needs    = { "SDL2" },
+        requires = { cfg },
+    })
+
+    # ----- The dhewm3 binary: engine + game + compilers ------
+
+    cook_cc.bin("dhewm3", {
+        sources  = { "neo/sys/linux/main.cpp" },
+        links    = { "sys", "framework", "renderer", "sound", "cm", "ui",
+                     "imgui", "gamecode", "d3xp", "compilers" },
+        needs    = { "SDL2", "OpenAL", "libcurl", "zlib" },
+        requires = { cfg },
+    })
+
+# ============================================================
+#  Asset pipeline — same DAG, dhewm3 is the tool
+# ============================================================
+#  `$<dhewm3>` in each cook command IS the cross-recipe dep:
+#  the engine infers that every map output needs dhewm3
+#  rebuilt. `$<in.stem>` fans the step out, one unit per .map.
 
 recipe maps
     ingredients "base/maps/*.map"
