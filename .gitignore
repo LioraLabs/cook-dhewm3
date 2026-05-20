@@ -14,3 +14,17 @@
 /.vs*
 
 /neo/CMakeSettings.json
+
+# Cook build artefacts
+/.cook/
+/cook_modules/
+/cook.lock
+
+# User-provided game assets (legal Doom 3 install required)
+/base/maps/*.proc
+/base/maps/*.cm
+/base/maps/*.aas48
+/base/maps/*.aas96
+/base/maps/*.aas120
+/base/pak*.pk4
+

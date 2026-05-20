@@ -1,0 +1,114 @@
+-- ============================================================
+--  dhewm3 — Doom 3 source port, built with Cook
+--
+--  Linux build. The engine, its built-in compilers (dmap,
+--  runaas), and the asset pipeline that USES those compilers
+--  all live in one DAG. `cook game` builds the binary and
+--  bakes every map in one parallel run, with full caching.
+-- ============================================================
+
+use cook_cc
+
+cook_cc.toolchain({ standard = "c++14", warnings = "off" })
+
+cook_cc.defaults({
+    defines      = { "_GNU_SOURCE", "ID_PC_LINUX", "USE_OPENAL" },
+    extra_cflags = "-fno-strict-aliasing -fvisibility=hidden",
+})
+
+-- -----------------------------------------------------------
+--  Engine static libs (in dependency order)
+-- -----------------------------------------------------------
+
+cook_cc.lib("idLib", {
+    dir              = "neo/idlib/",
+    export_includes  = { "neo", "neo/idlib" },
+    defines          = { "ID_LIB_INTERNAL" },
+})
+
+cook_cc.lib("framework", { dir = "neo/framework/", links = { "idLib" } })
+cook_cc.lib("cm",        { dir = "neo/cm/",        links = { "idLib" } })
+
+cook_cc.lib("renderer", {
+    dir   = "neo/renderer/",
+    links = { "idLib", "framework" },
+    needs = { "GL" },
+})
+
+cook_cc.lib("sound", {
+    dir   = "neo/sound/",
+    links = { "idLib", "framework" },
+    needs = { "OpenAL" },
+})
+
+cook_cc.lib("game", {
+    dir   = "neo/game/",
+    links = { "idLib", "framework", "cm", "renderer", "sound" },
+})
+
+cook_cc.lib("d3xp", {
+    dir   = "neo/d3xp/",
+    links = { "idLib", "framework", "cm", "renderer", "sound" },
+})
+
+cook_cc.lib("compilers", {
+    dir   = "neo/tools/compilers/",
+    links = { "idLib", "framework", "renderer", "cm" },
+})
+
+-- -----------------------------------------------------------
+--  Platform abstraction — per-OS source selection
+-- -----------------------------------------------------------
+
+local sys_sources = fs.glob({ "neo/sys/*.cpp", "neo/sys/sdl/*.cpp" })
+if cook.platform.os == "linux" then
+    for _, s in ipairs(fs.glob({ "neo/sys/posix/*.cpp",
+                                 "neo/sys/linux/*.cpp" })) do
+        table.insert(sys_sources, s)
+    end
+end
+
+cook_cc.lib("sys", {
+    sources = sys_sources,
+    links   = { "idLib", "framework" },
+    needs   = { "SDL2" },
+})
+
+-- -----------------------------------------------------------
+--  The dhewm3 binary: engine + game + in-engine compilers
+-- -----------------------------------------------------------
+
+cook_cc.bin("dhewm3", {
+    sources = { "neo/sys/main.cpp" },
+    links   = { "sys", "framework", "renderer", "sound", "cm",
+                "game", "d3xp", "compilers" },
+    needs   = { "SDL2", "OpenAL", "libcurl", "zlib" },
+})
+
+-- ============================================================
+--  Asset pipeline — same DAG, dhewm3 is the tool
+-- ============================================================
+--  `$<dhewm3>` in each cook command IS the cross-recipe dep:
+--  the engine infers that every map output needs dhewm3
+--  rebuilt. `$<in.stem>` fans the step out, one unit per .map.
+
+recipe maps
+    ingredients "base/maps/*.map"
+
+    cook "base/maps/$<in.stem>.proc" "base/maps/$<in.stem>.cm" using {
+        $<dhewm3> +dmap $<in> +quit
+    }
+
+    cook "base/maps/$<in.stem>.aas48"
+         "base/maps/$<in.stem>.aas96"
+         "base/maps/$<in.stem>.aas120" using {
+        $<dhewm3> +runaas $<in> +quit
+    }
+
+recipe game : dhewm3 maps
+
+recipe compile-commands : dhewm3
+    >> cook_cc.compile_commands()
+
+chore clean
+    rm -rf build .cook
