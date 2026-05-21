@@ -40,27 +40,6 @@ register
         end
     end
 
-    -- Configure header (replaces CMake's configure_file).
-    -- Held as a local recipe handle and threaded into every target's
-    -- `requires` below. The cc-module Move-4 redesign will eventually let
-    -- this go inside `defaults({ config_header = {...} })` and disappear
-    -- from the target lists — but cook_cc 0.10.2 doesn't support that yet,
-    -- and top-level `local` bindings are not part of Cook's surface grammar,
-    -- so the binding lives here.
-    local cfg = cook_cc.config_header(
-        "neo/config.h.in",
-        "build/dhewm3/config.h",
-        {
-            os                          = "linux",
-            cpu                         = "x86_64",
-            CMAKE_SHARED_LIBRARY_SUFFIX = ".so",
-            libdir                      = "",
-            datadir                     = "",
-            HAVE_JPEG_MEM_SRC           = true,
-            ID_ENABLE_CURL              = true,
-        }
-    )
-
 cook_cc.toolchain({ standard = "c++14", warnings = "none" })
 
 cook_cc.defaults({
@@ -78,6 +57,23 @@ cook_cc.defaults({
     -- lib both need this on their include path.
     includes     = { "neo/libs/imgui" },
     extra_cflags = "-fno-strict-aliasing -fvisibility=hidden",
+
+    -- Configure header (replaces CMake's configure_file). cook_cc 0.11.0
+    -- threads the synthesized recipe into every cc target's requires and
+    -- auto-joins the output dir ("build/dhewm3") to the include path.
+    config_header = {
+        from = "neo/config.h.in",
+        to   = "build/dhewm3/config.h",
+        vars = {
+            os                          = "linux",
+            cpu                         = "x86_64",
+            CMAKE_SHARED_LIBRARY_SUFFIX = ".so",
+            libdir                      = "",
+            datadir                     = "",
+            HAVE_JPEG_MEM_SRC           = true,
+            ID_ENABLE_CURL              = true,
+        },
+    },
 })
 
 # ----- Engine static libs (in dependency order) ----------
@@ -86,10 +82,11 @@ cook_cc.lib("idLib", {
     -- Bare `includes` is used by the target itself AND exported to
     -- consumers via the CS-0080 backcompat fall-back (includes is the
     -- only field where bare → public propagation still applies).
-    -- build/dhewm3 carries the generated config.h.
+    -- build/dhewm3 (where config.h lands) is auto-joined to includes
+    -- by cook_cc 0.11.0's defaults.config_header handling.
     sources  = srcs("neo/idlib", { "geometry/Surface_Polytope.cpp",
                                    "math/Complex.cpp" }),
-    includes = { "neo", "neo/idlib", "build/dhewm3" },
+    includes = { "neo", "neo/idlib" },
     defines  = { "ID_LIB_INTERNAL" },
     -- -fPIC because base.so + d3xp.so plugins link this static lib.
     -- Matches upstream CMakeLists.txt:1281-1283. extra_cflags overrides
@@ -98,14 +95,13 @@ cook_cc.lib("idLib", {
     -- sdl2 ships idlib's endian macros; needed for compile, not link.
     -- Lowercase matches cook_cc.finders curated table (curated:sdl2).
     needs    = { "sdl2" },
-    requires = { cfg },
 })
 
 # __DOOM_DLL__: engine-side declares its own `game`/`gameEdit` pointers and
 # compiles in LoadGameDLL's dlopen path. Matches upstream non-HARDLINK build.
-cook_cc.lib("framework", { sources = srcs("neo/framework"), defines = { "__DOOM_DLL__" }, links = { "idLib" }, needs = { "sdl2" }, requires = { cfg } })
-cook_cc.lib("cm",        { sources = srcs("neo/cm"),        links = { "idLib" },                          needs = { "sdl2" }, requires = { cfg } })
-cook_cc.lib("ui",        { sources = srcs("neo/ui", { "GameWindow.cpp" }), links = { "idLib", "framework" }, needs = { "sdl2" }, requires = { cfg } })
+cook_cc.lib("framework", { sources = srcs("neo/framework"), defines = { "__DOOM_DLL__" }, links = { "idLib" }, needs = { "sdl2" } })
+cook_cc.lib("cm",        { sources = srcs("neo/cm"),        links = { "idLib" },                              needs = { "sdl2" } })
+cook_cc.lib("ui",        { sources = srcs("neo/ui", { "GameWindow.cpp" }), links = { "idLib", "framework" },  needs = { "sdl2" } })
 
 # Dear ImGui — vendored under neo/libs/imgui (CMakeLists' `src_imgui`).
 cook_cc.lib("imgui", {
@@ -123,17 +119,15 @@ cook_cc.lib("imgui", {
 })
 
 cook_cc.lib("renderer", {
-    sources  = srcs("neo/renderer"),
-    links    = { "idLib", "framework" },
-    needs    = { "sdl2", "gl" },
-    requires = { cfg },
+    sources = srcs("neo/renderer"),
+    links   = { "idLib", "framework" },
+    needs   = { "sdl2", "gl" },
 })
 
 cook_cc.lib("sound", {
-    sources  = srcs("neo/sound"),
-    links    = { "idLib", "framework" },
-    needs    = { "openal", "sdl2" },
-    requires = { cfg },
+    sources = srcs("neo/sound"),
+    links   = { "idLib", "framework" },
+    needs   = { "openal", "sdl2" },
 })
 
 # Game code ships as DLL plugins matching upstream dhewm3's non-HARDLINK
@@ -151,7 +145,6 @@ cook_cc.shared("base", {
     defines  = { "GAME_DLL" },
     links    = { "idLib" },
     needs    = { "sdl2" },
-    requires = { cfg },
 })
 
 cook_cc.shared("d3xp", {
@@ -161,21 +154,18 @@ cook_cc.shared("d3xp", {
     defines  = { "GAME_DLL", "_D3XP" },
     links    = { "idLib" },
     needs    = { "sdl2" },
-    requires = { cfg },
 })
 
 cook_cc.lib("compilers", {
-    sources  = srcs("neo/tools/compilers"),
-    links    = { "idLib", "framework", "renderer", "cm" },
-    needs    = { "sdl2" },
-    requires = { cfg },
+    sources = srcs("neo/tools/compilers"),
+    links   = { "idLib", "framework", "renderer", "cm" },
+    needs   = { "sdl2" },
 })
 
 cook_cc.lib("sys", {
-    sources  = sys_sources,
-    links    = { "idLib", "framework" },
-    needs    = { "sdl2" },
-    requires = { cfg },
+    sources = sys_sources,
+    links   = { "idLib", "framework" },
+    needs   = { "sdl2" },
 })
 
 # ----- The dhewm3 binary: engine + game + compilers ------
@@ -199,7 +189,6 @@ cook_cc.bin("dhewm3", {
     -- a --start-group so ld can multi-pass resolve. game/d3xp are .so
     -- plugins now (base.so/d3xp.so) — not in this static link set.
     extra_ldflags = "-Wl,--start-group build/lib/libsys.a build/lib/libframework.a build/lib/libidLib.a build/lib/librenderer.a build/lib/libcm.a build/lib/libsound.a build/lib/libui.a build/lib/libimgui.a build/lib/libcompilers.a -Wl,--end-group -lm -lpthread -ldl",
-    requires      = { cfg },
 })
 
 # ============================================================
