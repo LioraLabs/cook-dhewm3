@@ -73,14 +73,21 @@ register
                                        "math/Complex.cpp" }),
         includes = { "neo", "neo/idlib", "build/dhewm3" },
         defines  = { "ID_LIB_INTERNAL" },
-        -- SDL2 ships idlib's endian macros; needed for compile, not link.
-        needs    = { "SDL2" },
+        -- -fPIC because base.so + d3xp.so plugins link this static lib.
+        -- Matches upstream CMakeLists.txt:1281-1283. extra_cflags overrides
+        -- (not merges with) cc.defaults; restate the defaults here.
+        extra_cflags = "-fno-strict-aliasing -fvisibility=hidden -fPIC",
+        -- sdl2 ships idlib's endian macros; needed for compile, not link.
+        -- Lowercase matches cook_cc.finders curated table (curated:sdl2).
+        needs    = { "sdl2" },
         requires = { cfg },
     })
 
-    cook_cc.lib("framework", { sources = srcs("neo/framework"), links = { "idLib" },                          needs = { "SDL2" }, requires = { cfg } })
-    cook_cc.lib("cm",        { sources = srcs("neo/cm"),        links = { "idLib" },                          needs = { "SDL2" }, requires = { cfg } })
-    cook_cc.lib("ui",        { sources = srcs("neo/ui", { "GameWindow.cpp" }), links = { "idLib", "framework" }, needs = { "SDL2" }, requires = { cfg } })
+    -- __DOOM_DLL__: engine-side declares its own `game`/`gameEdit` pointers and
+    -- compiles in LoadGameDLL's dlopen path. Matches upstream non-HARDLINK build.
+    cook_cc.lib("framework", { sources = srcs("neo/framework"), defines = { "__DOOM_DLL__" }, links = { "idLib" }, needs = { "sdl2" }, requires = { cfg } })
+    cook_cc.lib("cm",        { sources = srcs("neo/cm"),        links = { "idLib" },                          needs = { "sdl2" }, requires = { cfg } })
+    cook_cc.lib("ui",        { sources = srcs("neo/ui", { "GameWindow.cpp" }), links = { "idLib", "framework" }, needs = { "sdl2" }, requires = { cfg } })
 
     -- Dear ImGui — vendored under neo/libs/imgui (CMakeLists' `src_imgui`).
     cook_cc.lib("imgui", {
@@ -94,48 +101,55 @@ register
             "neo/libs/imgui/backends/imgui_impl_opengl2.cpp",
         },
         includes = { "neo" },
-        needs = { "SDL2", "GL" },
+        needs = { "sdl2", "gl" },
     })
 
     cook_cc.lib("renderer", {
         sources  = srcs("neo/renderer"),
         links    = { "idLib", "framework" },
-        needs    = { "SDL2", "GL" },
+        needs    = { "sdl2", "gl" },
         requires = { cfg },
     })
 
     cook_cc.lib("sound", {
         sources  = srcs("neo/sound"),
         links    = { "idLib", "framework" },
-        needs    = { "OpenAL", "SDL2" },
+        needs    = { "openal", "sdl2" },
         requires = { cfg },
     })
 
-    -- gamecode and d3xp need their own dir on includes for intra-lib
-    -- relative header references. Upstream uses HARDLINK_GAME for this.
-    -- Note: lib named gamecode not game so it does not shadow recipe game.
-    cook_cc.lib("gamecode", {
+    -- Game code ships as DLL plugins matching upstream dhewm3's non-HARDLINK
+    -- default: base.so + d3xp.so live next to the binary, the engine dlopens
+    -- them via GetGameAPI. GAME_DLL makes the game declare its own engine-
+    -- pointer globals (sys, common, renderSystem, ...); engine-side __DOOM_DLL__
+    -- on framework/binary tells the engine to expect them dynamic. base/d3xp
+    -- only link idLib — engine globals come from the host binary at dlopen.
+    -- CS-0084: `output = "build/bin/<name>.so"` lands the plugin next to
+    -- dhewm3 (PATH_EXE in LoadGameDLLbyName) with no `lib` prefix.
+    cook_cc.shared("base", {
         sources  = srcs("neo/game", { "EndLevel.cpp", "gamesys/Callbacks.cpp" }),
+        output   = "build/bin/base.so",
         includes = { "neo/game" },
-        defines  = { "GAME_DLL" },             -- declares DLL-side engine pointers
-        links    = { "idLib", "framework", "cm", "renderer", "sound", "ui" },
-        needs    = { "SDL2" },
+        defines  = { "GAME_DLL" },
+        links    = { "idLib" },
+        needs    = { "sdl2" },
         requires = { cfg },
     })
 
-    cook_cc.lib("d3xp", {
+    cook_cc.shared("d3xp", {
         sources  = srcs("neo/d3xp", { "EndLevel.cpp", "gamesys/Callbacks.cpp" }),
+        output   = "build/bin/d3xp.so",
         includes = { "neo/d3xp" },
-        defines  = { "GAME_DLL", "_D3XP" },    -- _D3XP gates D3XP-specific code
-        links    = { "idLib", "framework", "cm", "renderer", "sound", "ui" },
-        needs    = { "SDL2" },
+        defines  = { "GAME_DLL", "_D3XP" },
+        links    = { "idLib" },
+        needs    = { "sdl2" },
         requires = { cfg },
     })
 
     cook_cc.lib("compilers", {
         sources  = srcs("neo/tools/compilers"),
         links    = { "idLib", "framework", "renderer", "cm" },
-        needs    = { "SDL2" },
+        needs    = { "sdl2" },
         requires = { cfg },
     })
 
@@ -157,7 +171,7 @@ register
     cook_cc.lib("sys", {
         sources  = sys_sources,
         links    = { "idLib", "framework" },
-        needs    = { "SDL2" },
+        needs    = { "sdl2" },
         requires = { cfg },
     })
 
@@ -169,14 +183,19 @@ register
             -- DebuggerServer stubs needed by framework's Common.cpp.
             "neo/tools/debugger/DebuggerServer.cpp",
             "neo/tools/debugger/DebuggerScript.cpp",
+            "neo/tools/debugger/DebuggerBreakpoint.cpp",
             "neo/tools/debugger/debugger.cpp",
         },
+        -- __DOOM_DLL__ on the binary mirrors upstream non-HARDLINK build:
+        -- main.cpp + debugger stubs see the engine-side game pointer shape.
+        defines       = { "__DOOM_DLL__" },
         links         = { "sys", "framework", "renderer", "sound", "cm", "ui",
-                          "imgui", "gamecode", "d3xp", "compilers" },
-        needs         = { "SDL2", "OpenAL", "libcurl", "zlib" },
+                          "imgui", "compilers" },
+        needs         = { "sdl2", "openal", "libcurl", "zlib" },
         -- W18: engine libs have circular symbol references; re-list inside
-        -- a --start-group so ld can multi-pass resolve.
-        extra_ldflags = "-Wl,--start-group build/lib/libsys.a build/lib/libframework.a build/lib/libidLib.a build/lib/librenderer.a build/lib/libcm.a build/lib/libsound.a build/lib/libui.a build/lib/libimgui.a build/lib/libgamecode.a build/lib/libd3xp.a build/lib/libcompilers.a -Wl,--end-group -lm -lpthread -ldl",
+        -- a --start-group so ld can multi-pass resolve. game/d3xp are .so
+        -- plugins now (base.so/d3xp.so) — not in this static link set.
+        extra_ldflags = "-Wl,--start-group build/lib/libsys.a build/lib/libframework.a build/lib/libidLib.a build/lib/librenderer.a build/lib/libcm.a build/lib/libsound.a build/lib/libui.a build/lib/libimgui.a build/lib/libcompilers.a -Wl,--end-group -lm -lpthread -ldl",
         requires      = { cfg },
     })
 
@@ -200,7 +219,7 @@ recipe maps
         $<dhewm3> +runaas $<in> +quit
     }
 
-recipe game : dhewm3 maps
+recipe game : dhewm3 base d3xp maps
 
 recipe compile-commands : dhewm3
     >> cook_cc.compile_commands()
