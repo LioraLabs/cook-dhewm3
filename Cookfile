@@ -18,9 +18,15 @@ register
         local skip = {}
         for _, e in ipairs(excludes or {}) do skip[e] = true end
         local out = {}
+        -- fs.glob returns ABSOLUTE paths (Cook Standard §25.7 / CS-0079), so the
+        -- exclude key is the suffix after the "/<dir>/" segment, not a fixed-
+        -- offset prefix strip. `find(..., 1, true)` is a plain (non-pattern)
+        -- search, so a `dir` containing pattern-magic chars is still safe.
+        local marker = "/" .. dir .. "/"
         for _, ext in ipairs({ "*.cpp", "*.c" }) do
             for _, s in ipairs(fs.glob(dir .. "/**/" .. ext)) do
-                local rel = s:sub(#dir + 2)        -- strip "dir/" prefix
+                local i = s:find(marker, 1, true)
+                local rel = i and s:sub(i + #marker) or s
                 if not skip[rel] then out[#out + 1] = s end
             end
         end
@@ -201,20 +207,20 @@ cook_cc.bin("dhewm3", {
 recipe maps
     ingredients "base/maps/*.map"
 
-    cook "base/maps/$<in.stem>.proc" "base/maps/$<in.stem>.cm" using {
+    cook "base/maps/$<in.stem>.proc" "base/maps/$<in.stem>.cm" {
         $<dhewm3> +dmap $<in> +quit
     }
 
     cook "base/maps/$<in.stem>.aas48"
          "base/maps/$<in.stem>.aas96"
-         "base/maps/$<in.stem>.aas120" using {
+         "base/maps/$<in.stem>.aas120" {
         $<dhewm3> +runaas $<in> +quit
     }
 
 recipe game : dhewm3 base d3xp maps
 
 recipe compile-commands : dhewm3
-    >> cook_cc.compile_commands()
+    cook_cc.compile_commands()
 
 chore clean
     rm -rf build .cook
