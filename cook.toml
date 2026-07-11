@@ -1,5 +1,8 @@
 [registry]
 indexes = ["https://rocks.usecook.com"]
 
+# cook_cc 0.12.0-1 is hand-installed from the module-contract-trust milestone
+# branch via `luarocks make --tree cook_modules` (see cliban COOK ticket); NOT
+# yet on rocks.usecook.com. `cook modules install` will fail until it publishes.
 [modules]
-cook_cc = "0.11.0-1"
+cook_cc = "0.12.0-1"

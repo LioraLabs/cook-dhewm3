@@ -201,20 +201,20 @@ cook_cc.bin("dhewm3", {
 recipe maps
     ingredients "base/maps/*.map"
 
-    cook "base/maps/$<in.stem>.proc" "base/maps/$<in.stem>.cm" using {
+    cook "base/maps/$<in.stem>.proc" "base/maps/$<in.stem>.cm" {
         $<dhewm3> +dmap $<in> +quit
     }
 
     cook "base/maps/$<in.stem>.aas48"
          "base/maps/$<in.stem>.aas96"
-         "base/maps/$<in.stem>.aas120" using {
+         "base/maps/$<in.stem>.aas120" {
         $<dhewm3> +runaas $<in> +quit
     }
 
 recipe game : dhewm3 base d3xp maps
 
 recipe compile-commands : dhewm3
-    >> cook_cc.compile_commands()
+    cook_cc.compile_commands()
 
 chore clean
     rm -rf build .cook
