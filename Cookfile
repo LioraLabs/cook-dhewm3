@@ -46,7 +46,15 @@ register
         end
     end
 
+# ----- Toolchain + probes (top-level only, CS-0083) --------
+
 cook_cc.toolchain({ standard = "c++14", warnings = "none" })
+
+# Every external library this build touches, declared once. This is what
+# registers the cc:find:* probes at top level (CS-0083); the `needs`
+# entries inside the recipes below only REFERENCE these. A `needs` naming
+# a library not listed here is a register-phase error.
+cook_cc.uses("sdl2", "gl", "openal", "libcurl", "zlib")
 
 cook_cc.defaults({
     defines      = { "_GNU_SOURCE", "ID_PC_LINUX", "USE_OPENAL",
@@ -63,78 +71,96 @@ cook_cc.defaults({
     -- lib both need this on their include path.
     includes     = { "neo/libs/imgui" },
     extra_cflags = "-fno-strict-aliasing -fvisibility=hidden",
+})
 
-    -- Configure header (replaces CMake's configure_file). cook_cc 0.11.0
-    -- threads the synthesized recipe into every cc target's requires and
-    -- auto-joins the output dir ("build/dhewm3") to the include path.
-    config_header = {
-        from = "neo/config.h.in",
-        to   = "build/dhewm3/config.h",
-        vars = {
-            os                          = "linux",
-            cpu                         = "x86_64",
-            CMAKE_SHARED_LIBRARY_SUFFIX = ".so",
-            libdir                      = "",
-            datadir                     = "",
-            HAVE_JPEG_MEM_SRC           = true,
-            ID_ENABLE_CURL              = true,
-        },
+# Configure header (replaces CMake's configure_file). Top-level
+# configuration, not a user-invocable recipe: cook_cc mints one support
+# recipe (origin-annotated in `cook --list`) that renders the header, and
+# every maker below automatically joins build/dhewm3 onto its include path
+# and declares config.h in its compile units' inputs — the data edge.
+# Must be called before the first cc target (register-phase error).
+cook_cc.config_header({
+    from = "neo/config.h.in",
+    to   = "build/dhewm3/config.h",
+    vars = {
+        os                          = "linux",
+        cpu                         = "x86_64",
+        CMAKE_SHARED_LIBRARY_SUFFIX = ".so",
+        libdir                      = "",
+        datadir                     = "",
+        HAVE_JPEG_MEM_SRC           = true,
+        ID_ENABLE_CURL              = true,
     },
 })
 
-# ----- Engine static libs (in dependency order) ----------
+# ----- Engine static libs (listed in dependency order for readability) -----
+#  Declaration order is NOT load-bearing: `links` names sibling recipes and
+#  resolves against their exports regardless of textual position — cook_cc
+#  0.13 records the ordering edge via cook.require_recipe, so a `links` target
+#  may be declared anywhere in the file. An unknown/typo'd link name is an
+#  error (raised when the ordering edge fails to resolve). At the final bin/
+#  shared link, each linked lib's archive also folds into that link unit's
+#  inputs (data-level edge — no header deps; a cache-key fold); a static-lib
+#  target's `links` is ordering + export propagation only, no archive fold.
 
-cook_cc.lib("idLib", {
-    -- Bare `includes` is used by the target itself AND exported to
-    -- consumers via the CS-0080 backcompat fall-back (includes is the
-    -- only field where bare → public propagation still applies).
-    -- build/dhewm3 (where config.h lands) is auto-joined to includes
-    -- by cook_cc 0.11.0's defaults.config_header handling.
-    sources  = srcs("neo/idlib", { "geometry/Surface_Polytope.cpp",
-                                   "math/Complex.cpp" }),
-    includes = { "neo", "neo/idlib" },
-    defines  = { "ID_LIB_INTERNAL" },
-    -- -fPIC because base.so + d3xp.so plugins link this static lib.
-    -- Matches upstream CMakeLists.txt:1281-1283. extra_cflags overrides
-    -- (not merges with) cc.defaults; restate the defaults here.
-    extra_cflags = "-fno-strict-aliasing -fvisibility=hidden -fPIC",
-    -- sdl2 ships idlib's endian macros; needed for compile, not link.
-    -- Lowercase matches cook_cc.finders curated table (curated:sdl2).
-    needs    = { "sdl2" },
-})
+recipe idLib
+    cook_cc.lib({
+        -- Bare `includes` is used by the target itself AND exported to
+        -- consumers via the CS-0080 backcompat fall-back (includes is the
+        -- only field where bare → public propagation still applies).
+        sources  = srcs("neo/idlib", { "geometry/Surface_Polytope.cpp",
+                                       "math/Complex.cpp" }),
+        includes = { "neo", "neo/idlib" },
+        defines  = { "ID_LIB_INTERNAL" },
+        -- -fPIC because base.so + d3xp.so plugins link this static lib.
+        -- Matches upstream CMakeLists.txt:1281-1283. extra_cflags overrides
+        -- (not merges with) cc.defaults; restate the defaults here.
+        extra_cflags = "-fno-strict-aliasing -fvisibility=hidden -fPIC",
+        -- sdl2 ships idlib's endian macros; needed for compile, not link.
+        -- Lowercase matches cook_cc.finders curated table (curated:sdl2).
+        needs    = { "sdl2" },
+    })
 
 # __DOOM_DLL__: engine-side declares its own `game`/`gameEdit` pointers and
 # compiles in LoadGameDLL's dlopen path. Matches upstream non-HARDLINK build.
-cook_cc.lib("framework", { sources = srcs("neo/framework"), defines = { "__DOOM_DLL__" }, links = { "idLib" }, needs = { "sdl2" } })
-cook_cc.lib("cm",        { sources = srcs("neo/cm"),        links = { "idLib" },                              needs = { "sdl2" } })
-cook_cc.lib("ui",        { sources = srcs("neo/ui", { "GameWindow.cpp" }), links = { "idLib", "framework" },  needs = { "sdl2" } })
+recipe framework
+    cook_cc.lib({ sources = srcs("neo/framework"), defines = { "__DOOM_DLL__" }, links = { "idLib" }, needs = { "sdl2" } })
+
+recipe cm
+    cook_cc.lib({ sources = srcs("neo/cm"), links = { "idLib" }, needs = { "sdl2" } })
+
+recipe ui
+    cook_cc.lib({ sources = srcs("neo/ui", { "GameWindow.cpp" }), links = { "idLib", "framework" }, needs = { "sdl2" } })
 
 # Dear ImGui — vendored under neo/libs/imgui (CMakeLists' `src_imgui`).
-cook_cc.lib("imgui", {
-    sources = {
-        "neo/libs/imgui/imgui.cpp",
-        "neo/libs/imgui/imgui_draw.cpp",
-        "neo/libs/imgui/imgui_tables.cpp",
-        "neo/libs/imgui/imgui_widgets.cpp",
-        "neo/libs/imgui/imgui_demo.cpp",
-        "neo/libs/imgui/backends/imgui_impl_sdl2.cpp",
-        "neo/libs/imgui/backends/imgui_impl_opengl2.cpp",
-    },
-    includes = { "neo" },
-    needs = { "sdl2", "gl" },
-})
+recipe imgui
+    cook_cc.lib({
+        sources = {
+            "neo/libs/imgui/imgui.cpp",
+            "neo/libs/imgui/imgui_draw.cpp",
+            "neo/libs/imgui/imgui_tables.cpp",
+            "neo/libs/imgui/imgui_widgets.cpp",
+            "neo/libs/imgui/imgui_demo.cpp",
+            "neo/libs/imgui/backends/imgui_impl_sdl2.cpp",
+            "neo/libs/imgui/backends/imgui_impl_opengl2.cpp",
+        },
+        includes = { "neo" },
+        needs = { "sdl2", "gl" },
+    })
 
-cook_cc.lib("renderer", {
-    sources = srcs("neo/renderer"),
-    links   = { "idLib", "framework" },
-    needs   = { "sdl2", "gl" },
-})
+recipe renderer
+    cook_cc.lib({
+        sources = srcs("neo/renderer"),
+        links   = { "idLib", "framework" },
+        needs   = { "sdl2", "gl" },
+    })
 
-cook_cc.lib("sound", {
-    sources = srcs("neo/sound"),
-    links   = { "idLib", "framework" },
-    needs   = { "openal", "sdl2" },
-})
+recipe sound
+    cook_cc.lib({
+        sources = srcs("neo/sound"),
+        links   = { "idLib", "framework" },
+        needs   = { "openal", "sdl2" },
+    })
 
 # Game code ships as DLL plugins matching upstream dhewm3's non-HARDLINK
 # default: base.so + d3xp.so live next to the binary, the engine dlopens
@@ -144,58 +170,67 @@ cook_cc.lib("sound", {
 # only link idLib — engine globals come from the host binary at dlopen.
 # CS-0084: `output = "build/bin/<name>.so"` lands the plugin next to
 # dhewm3 (PATH_EXE in LoadGameDLLbyName) with no `lib` prefix.
-cook_cc.shared("base", {
-    sources  = srcs("neo/game", { "EndLevel.cpp", "gamesys/Callbacks.cpp" }),
-    output   = "build/bin/base.so",
-    includes = { "neo/game" },
-    defines  = { "GAME_DLL" },
-    links    = { "idLib" },
-    needs    = { "sdl2" },
-})
+recipe base
+    cook_cc.shared({
+        sources  = srcs("neo/game", { "EndLevel.cpp", "gamesys/Callbacks.cpp" }),
+        output   = "build/bin/base.so",
+        includes = { "neo/game" },
+        defines  = { "GAME_DLL" },
+        links    = { "idLib" },
+        needs    = { "sdl2" },
+    })
 
-cook_cc.shared("d3xp", {
-    sources  = srcs("neo/d3xp", { "EndLevel.cpp", "gamesys/Callbacks.cpp" }),
-    output   = "build/bin/d3xp.so",
-    includes = { "neo/d3xp" },
-    defines  = { "GAME_DLL", "_D3XP" },
-    links    = { "idLib" },
-    needs    = { "sdl2" },
-})
+recipe d3xp
+    cook_cc.shared({
+        sources  = srcs("neo/d3xp", { "EndLevel.cpp", "gamesys/Callbacks.cpp" }),
+        output   = "build/bin/d3xp.so",
+        includes = { "neo/d3xp" },
+        defines  = { "GAME_DLL", "_D3XP" },
+        links    = { "idLib" },
+        needs    = { "sdl2" },
+    })
 
-cook_cc.lib("compilers", {
-    sources = srcs("neo/tools/compilers"),
-    links   = { "idLib", "framework", "renderer", "cm" },
-    needs   = { "sdl2" },
-})
+recipe compilers
+    cook_cc.lib({
+        sources = srcs("neo/tools/compilers"),
+        links   = { "idLib", "framework", "renderer", "cm" },
+        needs   = { "sdl2" },
+    })
 
-cook_cc.lib("sys", {
-    sources = sys_sources,
-    links   = { "idLib", "framework" },
-    needs   = { "sdl2" },
-})
+recipe sys
+    cook_cc.lib({
+        sources = sys_sources,
+        links   = { "idLib", "framework" },
+        needs   = { "sdl2" },
+    })
 
-# ----- The dhewm3 binary: engine + game + compilers ------
+# ----- The dhewm3 binary: engine + game + compilers --------
 
-cook_cc.bin("dhewm3", {
-    sources       = {
-        "neo/sys/linux/main.cpp",
-        -- DebuggerServer stubs needed by framework's Common.cpp.
-        "neo/tools/debugger/DebuggerServer.cpp",
-        "neo/tools/debugger/DebuggerScript.cpp",
-        "neo/tools/debugger/DebuggerBreakpoint.cpp",
-        "neo/tools/debugger/debugger.cpp",
-    },
-    -- __DOOM_DLL__ on the binary mirrors upstream non-HARDLINK build:
-    -- main.cpp + debugger stubs see the engine-side game pointer shape.
-    defines       = { "__DOOM_DLL__" },
-    links         = { "sys", "framework", "renderer", "sound", "cm", "ui",
-                      "imgui", "compilers" },
-    needs         = { "sdl2", "openal", "libcurl", "zlib" },
-    -- W18: engine libs have circular symbol references; re-list inside
-    -- a --start-group so ld can multi-pass resolve. game/d3xp are .so
-    -- plugins now (base.so/d3xp.so) — not in this static link set.
-    extra_ldflags = "-Wl,--start-group build/lib/libsys.a build/lib/libframework.a build/lib/libidLib.a build/lib/librenderer.a build/lib/libcm.a build/lib/libsound.a build/lib/libui.a build/lib/libimgui.a build/lib/libcompilers.a -Wl,--end-group -lm -lpthread -ldl",
-})
+recipe dhewm3
+    cook_cc.bin({
+        sources       = {
+            "neo/sys/linux/main.cpp",
+            -- DebuggerServer stubs needed by framework's Common.cpp.
+            "neo/tools/debugger/DebuggerServer.cpp",
+            "neo/tools/debugger/DebuggerScript.cpp",
+            "neo/tools/debugger/DebuggerBreakpoint.cpp",
+            "neo/tools/debugger/debugger.cpp",
+        },
+        -- __DOOM_DLL__ on the binary mirrors upstream non-HARDLINK build:
+        -- main.cpp + debugger stubs see the engine-side game pointer shape.
+        defines       = { "__DOOM_DLL__" },
+        links         = { "sys", "framework", "renderer", "sound", "cm", "ui",
+                          "imgui", "compilers" },
+        needs         = { "sdl2", "openal", "libcurl", "zlib" },
+        -- W18: engine libs have circular symbol references; re-list inside
+        -- a --start-group so ld can multi-pass resolve. Under cook_cc 0.13
+        -- these archives are ALSO declared link-unit inputs (via `links`),
+        -- so this string is purely the link-order surface, no longer the
+        -- hidden dependency carrier. game/d3xp are .so plugins (base.so/
+        -- d3xp.so) — not in this static link set. A future cook_cc
+        -- link_group surface would subsume this line.
+        extra_ldflags = "-Wl,--start-group build/lib/libsys.a build/lib/libframework.a build/lib/libidLib.a build/lib/librenderer.a build/lib/libcm.a build/lib/libsound.a build/lib/libui.a build/lib/libimgui.a build/lib/libcompilers.a -Wl,--end-group -lm -lpthread -ldl",
+    })
 
 # ============================================================
 #  Asset pipeline — same DAG, dhewm3 is the tool
