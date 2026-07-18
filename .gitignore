@@ -14,3 +14,31 @@
 /.vs*
 
 /neo/CMakeSettings.json
+
+# Cook build artefacts
+/.cook/
+/cook_modules/
+/.worktrees/
+# clangd / editor index cache
+/.cache/
+/cook.lock
+/compile_commands.json
+# cook's cmake-driver probe artefact (cmake --find-package side-effect)
+/CMakeFiles/
+
+# User-provided game assets. A legal Doom 3 install is required to run the
+# game, and its copyrighted data must NEVER be committed. The blanket *.pk4
+# rule guards base/, d3xp/, and any mod dir; the rest covers dmap/runaas-
+# derived assets.
+*.pk4
+/base/maps/*.proc
+/base/maps/*.cm
+/base/maps/*.aas48
+/base/maps/*.aas96
+/base/maps/*.aas120
+/d3xp/maps/*.proc
+/d3xp/maps/*.cm
+/d3xp/maps/*.aas48
+/d3xp/maps/*.aas96
+/d3xp/maps/*.aas120
+
