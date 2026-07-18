@@ -93,6 +93,12 @@ cook_cc.config_header({
     },
 })
 
+# Top-level compile_commands.json (CS-0151, §28.3.11 / cook_cc 0.14): queues
+# a cook.on_register_complete finalizer (CS-0149) that writes the DB once
+# every recipe body in this pass has registered, so it's always complete —
+# no separate `compile-commands` recipe to invoke.
+cook_cc.compile_commands()
+
 # ----- Engine static libs (listed in dependency order for readability) -----
 #  Declaration order is NOT load-bearing: `links` names sibling recipes and
 #  resolves against their exports regardless of textual position — cook_cc
@@ -253,9 +259,6 @@ recipe maps
     }
 
 recipe game : dhewm3 base d3xp maps
-
-recipe compile-commands : dhewm3
-    cook_cc.compile_commands()
 
 chore clean
     rm -rf build .cook
