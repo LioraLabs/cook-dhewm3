@@ -45,9 +45,10 @@ Other targets:
 ```sh
 cook menu                 # list every recipe and chore
 cook dhewm3               # just the engine binary
-cook compile-commands     # generate compile_commands.json for clangd/IDEs
 cook clean                # remove build/ and .cook/
 ```
+
+`compile_commands.json` is regenerated automatically at the repo root on every build — there is no separate target.
 
 ## Running the game
 

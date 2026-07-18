@@ -1,8 +1,8 @@
 [registry]
 indexes = ["https://rocks.usecook.com"]
 
-# cook_cc 0.13.0-1 is hand-installed from the explicit-recipes milestone branch
-# (the step-contributor break) via `luarocks make --tree cook_modules`; NOT yet
+# cook_cc 0.14.0-1 is still unpublished, hand-installed from the local
+# cook-modules checkout via `luarocks make --tree cook_modules`; NOT yet
 # on rocks.usecook.com. `cook modules install` will fail until it publishes.
 [modules]
-cook_cc = "0.13.0-1"
+cook_cc = "0.14.0-1"
