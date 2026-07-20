@@ -19,6 +19,9 @@ console, after the build, remembering yourself when a change made it
 necessary. Here they are ordinary nodes in the build graph, expressed with
 a mechanism no other build tool has.
 
+> [!NOTE]
+> This repository is an architectural case study, not currently a native-build performance benchmark. Cook models the engine, plugins, and generated map assets as one artifact graph, but its clean-build execution is presently substantially slower than the mature CMake/Ninja pipeline. Improving that overhead is active work.
+
 ## First pull, no game data
 
 ```sh
