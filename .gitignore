@@ -42,3 +42,13 @@
 /d3xp/maps/*.aas96
 /d3xp/maps/*.aas120
 
+
+# engine droppings when fs_savepath is pinned to the repo
+/base/consolehistory.dat
+/d3xp/consolehistory.dat
+/base/dhewm3.cfg
+/d3xp/dhewm3.cfg
+dhewm3log*.txt
+
+# upstream cmake build dir (side-by-side comparison builds)
+/build-cmake/

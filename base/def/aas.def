@@ -1,0 +1,71 @@
+// cookdemo: minimal free AAS settings so runaas has area types to build.
+// Dimensions mirror the conventional humanoid/large/huge hulls.
+
+entityDef aas48 {
+	"mins"						"-24 -24 0"
+	"maxs"						"24 24 82"
+	"usePatches"				"0"
+	"writeBrushMap"				"0"
+	"playerFlood"				"1"
+	"allowSwimReachabilities"	"0"
+	"allowFlyReachabilities"	"0"
+	"fileExtension"				"aas48"
+	"gravity"					"0 0 -1050"
+	"maxStepHeight"				"14"
+	"maxBarrierHeight"			"32"
+	"maxWaterJumpHeight"		"20"
+	"maxFallHeight"				"64"
+	"minFloorCos"				"0.6999999881"
+	"tt_barrierJump"			"100"
+	"tt_startCrouching"		"100"
+	"tt_waterJump"			"100"
+	"tt_startWalkOffLedge"	"100"
+}
+
+entityDef aas96 {
+	"mins"						"-47 -47 0"
+	"maxs"						"47 47 82"
+	"usePatches"				"0"
+	"writeBrushMap"				"0"
+	"playerFlood"				"1"
+	"allowSwimReachabilities"	"0"
+	"allowFlyReachabilities"	"0"
+	"fileExtension"				"aas96"
+	"gravity"					"0 0 -1050"
+	"maxStepHeight"				"14"
+	"maxBarrierHeight"			"32"
+	"maxWaterJumpHeight"		"20"
+	"maxFallHeight"				"64"
+	"minFloorCos"				"0.6999999881"
+	"tt_barrierJump"			"100"
+	"tt_startCrouching"		"100"
+	"tt_waterJump"			"100"
+	"tt_startWalkOffLedge"	"100"
+}
+
+entityDef aas120 {
+	"mins"						"-60 -60 0"
+	"maxs"						"60 60 82"
+	"usePatches"				"0"
+	"writeBrushMap"				"0"
+	"playerFlood"				"1"
+	"allowSwimReachabilities"	"0"
+	"allowFlyReachabilities"	"0"
+	"fileExtension"				"aas120"
+	"gravity"					"0 0 -1050"
+	"maxStepHeight"				"14"
+	"maxBarrierHeight"			"32"
+	"maxWaterJumpHeight"		"20"
+	"maxFallHeight"				"64"
+	"minFloorCos"				"0.6999999881"
+	"tt_barrierJump"			"100"
+	"tt_startCrouching"		"100"
+	"tt_waterJump"			"100"
+	"tt_startWalkOffLedge"	"100"
+}
+
+entityDef aas_types {
+	"type1"	"aas48"
+	"type2"	"aas96"
+	"type3"	"aas120"
+}

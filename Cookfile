@@ -70,7 +70,10 @@ cook_cc.defaults({
     -- neo/libs/imgui is dhewm3's vendored Dear ImGui; sys lib + the imgui
     -- lib both need this on their include path.
     includes     = { "neo/libs/imgui" },
-    extra_cflags = "-fno-strict-aliasing -fvisibility=hidden",
+    -- -g -ggdb -O2 -fno-omit-frame-pointer mirror the upstream CMake
+    -- defaults, so both descriptions produce comparable builds of the
+    -- same engine.
+    extra_cflags = "-g -ggdb -O2 -fno-omit-frame-pointer -fno-strict-aliasing -fvisibility=hidden",
 })
 
 # Configure header (replaces CMake's configure_file). Top-level
@@ -119,8 +122,10 @@ recipe idLib
         includes = { "neo", "neo/idlib" },
         defines  = { "ID_LIB_INTERNAL" },
         -- -fPIC because base.so + d3xp.so plugins link this static lib.
-        -- Matches upstream CMakeLists.txt:1281-1283. extra_cflags overrides
-        -- (not merges with) cc.defaults; restate the defaults here.
+        -- Matches upstream CMakeLists.txt:1281-1283. Since cook_cc's
+        -- join_flags fix, per-target extra_cflags APPEND to cc.defaults;
+        -- the restated flags here are redundant but harmless (kept to
+        -- avoid re-keying this recipe for a comment).
         extra_cflags = "-fno-strict-aliasing -fvisibility=hidden -fPIC",
         -- sdl2 ships idlib's endian macros; needed for compile, not link.
         -- Lowercase matches cook_cc.finders curated table (curated:sdl2).
@@ -245,18 +250,26 @@ recipe dhewm3
 #  the engine infers that every map output needs dhewm3
 #  rebuilt. `$<in.stem>` fans the step out, one unit per .map.
 
+# fs_basepath/fs_savepath are pinned to the repo: without them the engine
+# resolves game data against ~/.local/share/dhewm3 and its own install
+# prefix — an undeclared input that made map outputs depend on whatever
+# data happened to live in the invoking user's home directory.
 recipe maps
     ingredients "base/maps/*.map"
 
     cook "base/maps/$<in.stem>.proc" "base/maps/$<in.stem>.cm" {
-        $<dhewm3> +dmap $<in> +quit
+        $<dhewm3> +set fs_basepath . +set fs_savepath . +set r_fullscreen 0 +dmap $<in.stem> +quit
     }
 
+    # nondet: `cook cache verify` caught runaas serializing uninitialized
+    # memory into .aas files (pointer-shaped garbage in reachability
+    # records — an upstream engine quirk, harmless at load time). The
+    # output is intrinsically non-byte-reproducible, so say so.
     cook "base/maps/$<in.stem>.aas48"
          "base/maps/$<in.stem>.aas96"
          "base/maps/$<in.stem>.aas120" {
-        $<dhewm3> +runaas $<in> +quit
-    }
+        $<dhewm3> +set fs_basepath . +set fs_savepath . +set r_fullscreen 0 +runaas $<in.stem> +quit
+    } nondet
 
 recipe game : dhewm3 base d3xp maps
 

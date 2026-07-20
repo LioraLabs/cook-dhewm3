@@ -1,0 +1,14 @@
+_default
+{
+  diffusemap _white
+}
+
+_tracemodel
+{
+  collision
+}
+
+textures/cookdemo/wall
+{
+  diffusemap _white
+}

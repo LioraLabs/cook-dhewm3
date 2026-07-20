@@ -1,0 +1,89 @@
+Version 2
+// entity 0
+{
+"classname" "worldspawn"
+// brush 0
+{
+brushDef3
+{
+( 1 0 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( -1 0 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 1 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 -1 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 1 0 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 -1 -16 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+}
+}
+// brush 1
+{
+brushDef3
+{
+( 1 0 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( -1 0 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 1 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 -1 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 1 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 -1 160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+}
+}
+// brush 2
+{
+brushDef3
+{
+( 1 0 0 160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( -1 0 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 1 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 -1 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 1 -160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 -1 0 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+}
+}
+// brush 3
+{
+brushDef3
+{
+( 1 0 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( -1 0 0 160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 1 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 -1 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 1 -160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 -1 0 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+}
+}
+// brush 4
+{
+brushDef3
+{
+( 1 0 0 -160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( -1 0 0 -160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 1 0 160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 -1 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 1 -160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 -1 0 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+}
+}
+// brush 5
+{
+brushDef3
+{
+( 1 0 0 -160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( -1 0 0 -160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 1 0 -176 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 -1 0 160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 1 -160 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+( 0 0 -1 0 ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "textures/cookdemo/wall" 0 0 0
+}
+}
+}
+{
+"classname" "info_player_start"
+"name" "info_player_start_1"
+"origin" "0 0 8"
+"angle" "90"
+}
+{
+"classname" "light"
+"name" "light_1"
+"origin" "0 0 100"
+"light_radius" "220 220 160"
+}
