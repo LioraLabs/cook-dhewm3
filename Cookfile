@@ -255,7 +255,7 @@ recipe dhewm3
 # prefix — an undeclared input that made map outputs depend on whatever
 # data happened to live in the invoking user's home directory.
 recipe maps
-    ingredients "base/maps/*.map"
+    gather "base/maps/*.map"
 
     cook "base/maps/$<in.stem>.proc" "base/maps/$<in.stem>.cm" {
         $<dhewm3> +set fs_basepath . +set fs_savepath . +set r_fullscreen 0 +dmap $<in.stem> +quit
